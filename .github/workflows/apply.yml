@@ -40,8 +40,8 @@ jobs:
       stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
       command: apply
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
     secrets:
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-2:
@@ -56,8 +56,8 @@ jobs:
       stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
       command: apply
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
     secrets:
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-3:
@@ -72,6 +72,6 @@ jobs:
       stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
       command: apply
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
     secrets:
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}

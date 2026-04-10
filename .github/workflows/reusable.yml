@@ -14,10 +14,9 @@ on:
         required: true
         type: string
         description: 'plan, apply, validate, or drift'
+    secrets:
       assume_role_arn:
         required: true
-        type: string
-    secrets:
       aws_role_session_name:
         required: false
 
@@ -36,7 +35,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ inputs.assume_role_arn }}
+          role-to-assume: ${{ secrets.assume_role_arn }}
           aws-region: ${{ inputs.region }}
           role-session-name: ${{ secrets.aws_role_session_name || 'GitHubActions' }}
 
@@ -62,7 +61,7 @@ jobs:
         if: inputs.command == 'plan'
         working-directory: stacks/${{ inputs.stack }}
         run: |
-          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ inputs.assume_role_arn }}" -out=tfplan
+          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ secrets.assume_role_arn }}" -out=tfplan
         continue-on-error: true
 
       - name: Terraform Apply
@@ -74,4 +73,4 @@ jobs:
         if: inputs.command == 'drift'
         working-directory: stacks/${{ inputs.stack }}
         run: |
-          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ inputs.assume_role_arn }}" -detailed-exitcode
+          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ secrets.assume_role_arn }}" -detailed-exitcode
