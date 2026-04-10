@@ -84,8 +84,8 @@ def build_stages(stacks, deps):
         for _ in range(len(queue)):
             stack = queue.popleft()
             current_stage.append(stack)
-            for dependent in deps:
-                if stack in deps[dependent]:
+            for dependent in stacks:
+                if stack in deps.get(dependent, []):
                     in_degree[dependent] -= 1
                     if in_degree[dependent] == 0:
                         queue.append(dependent)
