@@ -10,11 +10,11 @@ on:
       action:
         required: true
         type: string
-    secrets:
-      AWS_ACCOUNT_ID:
-        required: true
-      AWS_ROLE_NAME:
-        required: true
+    # secrets:
+    #   AWS_ACCOUNT_ID:
+    #     required: false
+    #   AWS_ROLE_NAME:
+    #     required: false
 
 jobs:
   terraform:
@@ -29,18 +29,18 @@ jobs:
 
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          role-to-assume: arn:aws:iam::363234579585:role/github-actions-role
           aws-region: ${{ matrix.region }}
 
       - name: Init
         working-directory: ${{ matrix.path }}
         run: |
 
-terraform init \
-  -backend-config="bucket=s3-backend-git-9696" \
-  -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
-  -backend-config="region=ap-south-1" \
-  -backend-config="dynamodb_table=terraform-locks"
+          terraform init \
+            -backend-config="bucket=s3-backend-git-9696" \
+            -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
+            -backend-config="region=us-east-1" \
+            -backend-config="dynamodb_table=terraform-locks"
 
 
       - name: Fmt

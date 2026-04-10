@@ -2,8 +2,8 @@
 name: Drift Detection
 
 on:
-  schedule:
-    - cron: "0 6 * * *"
+  # schedule:
+  #   - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -25,19 +25,19 @@ jobs:
             cd $path
 
 
-terraform init \
-  -backend-config="bucket=s3-backend-git-9696" \
-  -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
-  -backend-config="region=ap-south-1" \
-  -backend-config="dynamodb_table=terraform-locks"
+            terraform init \
+              -backend-config="bucket=s3-backend-git-9696" \
+              -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
+              -backend-config="region=ap-south-1" \
+              -backend-config="dynamodb_table=terraform-locks"
 
 
-            terraform plan -detailed-exitcode || code=$?
+                        terraform plan -detailed-exitcode || code=$?
 
-            if [ "$code" = "2" ]; then
-              echo "Drift detected in $path"
-              exit 1
-            fi
+                        if [ "$code" = "2" ]; then
+                          echo "Drift detected in $path"
+                          exit 1
+                        fi
 
-            cd -
-          done
+                        cd -
+                      done
