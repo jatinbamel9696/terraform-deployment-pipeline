@@ -29,6 +29,7 @@ jobs:
 
   drift:
     needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions && fromJson(needs.generate-matrix.outputs.matrix).regions[0]
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
