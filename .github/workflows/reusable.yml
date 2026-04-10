@@ -46,7 +46,7 @@ jobs:
         run: |
           terraform init \
             -backend-config="key=stacks/${{ inputs.stack }}/${{ inputs.region }}/terraform.tfstate" \
-            -backend-config="region=${{ inputs.region }}" \
+            -backend-config="region=us-east-1" \
             -upgrade
 
       - name: Terraform Plan
