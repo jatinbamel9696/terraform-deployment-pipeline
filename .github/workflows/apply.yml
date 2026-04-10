@@ -1,0 +1,50 @@
+
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine SHAs
+        id: shas
+        run: |
+          echo "sha1=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          echo "sha2=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Generate Matrix
+        id: generate
+        run: |
+          python3 scripts/generate_matrix.py ${{ steps.shas.outputs.sha1 }} ${{ steps.shas.outputs.sha2 }} > matrix.json
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  deploy:
+    needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions && fromJson(needs.generate-matrix.outputs.matrix).regions[0]
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
+      command: apply
+    secrets:
+      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
