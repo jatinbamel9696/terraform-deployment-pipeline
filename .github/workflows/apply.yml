@@ -12,7 +12,7 @@ jobs:
       matrix: ${{ steps.m.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - run: git diff --name-only HEAD~1 HEAD > changed.txt
       - id: m
         run: |
