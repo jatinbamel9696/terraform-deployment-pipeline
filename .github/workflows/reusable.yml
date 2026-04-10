@@ -80,6 +80,11 @@ jobs:
       - name: Terraform Plan
         if: inputs.command == 'plan'
         working-directory: stacks/${{ matrix.stack }}
+        run: terraform plan -var="region=${{ inputs.region }}"
+
+      - name: Terraform Plan (for Apply)
+        if: inputs.command == 'apply'
+        working-directory: stacks/${{ matrix.stack }}
         run: terraform plan -var="region=${{ inputs.region }}" -out=tfplan
 
       - name: Terraform Apply
