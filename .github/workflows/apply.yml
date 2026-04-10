@@ -39,45 +39,42 @@ jobs:
     if: fromJson(needs.generate-matrix.outputs.matrix).stages[0]
     strategy:
       matrix:
-        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0].stacks }}
-        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0].regions }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0] }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
-      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
+      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-2:
     needs: [generate-matrix, stage-1]
     if: fromJson(needs.generate-matrix.outputs.matrix).stages[1]
     strategy:
       matrix:
-        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1].stacks }}
-        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1].regions }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1] }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
-      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
+      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-3:
     needs: [generate-matrix, stage-2]
     if: fromJson(needs.generate-matrix.outputs.matrix).stages[2]
     strategy:
       matrix:
-        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2].stacks }}
-        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2].regions }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2] }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
-      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
+      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
+      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}

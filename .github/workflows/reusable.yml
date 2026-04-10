@@ -5,11 +5,19 @@ on:
   workflow_call:
     inputs:
       stack:
-        required: true
+        required: false
         type: string
       region:
         required: true
         type: string
+      stacks:
+        required: false
+        type: string
+        description: 'JSON array of stacks to process'
+      stage:
+        required: false
+        type: number
+        description: 'Deployment stage number'
       command:
         required: true
         type: string
@@ -21,10 +29,28 @@ on:
         required: false
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      stacks: ${{ steps.set-stacks.outputs.stacks }}
+    steps:
+      - name: Set stacks
+        id: set-stacks
+        run: |
+          if [ -n "${{ inputs.stacks }}" ]; then
+            echo "stacks=${{ inputs.stacks }}" >> $GITHUB_OUTPUT
+          else
+            echo "stacks=[\"${{ inputs.stack }}\"]" >> $GITHUB_OUTPUT
+          fi
+
   terraform:
+    needs: prepare
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+    strategy:
+      matrix:
+        stack: ${{ fromJson(needs.prepare.outputs.stacks) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,24 +68,24 @@ jobs:
           role-session-name: ${{ secrets.AWS_ROLE_SESSION_NAME || 'GitHubActions' }}
 
       - name: Terraform Init
-        working-directory: stacks/${{ inputs.stack }}
+        working-directory: stacks/${{ matrix.stack }}
         run: |
           terraform init \
-            -backend-config="key=stacks/${{ inputs.stack }}/${{ inputs.region }}/terraform.tfstate" \
+            -backend-config="key=stacks/${{ matrix.stack }}/${{ inputs.region }}/terraform.tfstate" \
             -backend-config="region=us-east-1" \
             -upgrade
 
       - name: Terraform Plan
         if: inputs.command == 'plan'
-        working-directory: stacks/${{ inputs.stack }}
+        working-directory: stacks/${{ matrix.stack }}
         run: terraform plan -var="region=${{ inputs.region }}" -out=tfplan
 
       - name: Terraform Apply
         if: inputs.command == 'apply'
-        working-directory: stacks/${{ inputs.stack }}
+        working-directory: stacks/${{ matrix.stack }}
         run: terraform apply -auto-approve tfplan
 
       - name: Terraform Plan (Drift Detection)
         if: inputs.command == 'drift'
-        working-directory: stacks/${{ inputs.stack }}
+        working-directory: stacks/${{ matrix.stack }}
         run: terraform plan -var="region=${{ inputs.region }}" -detailed-exitcode

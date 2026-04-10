@@ -114,10 +114,12 @@ def main():
         ],
         "stages": [
             {
+                "region": region,
                 "stacks": stage_stacks,
-                "regions": regions
+                "stage": i + 1
             }
-            for stage_stacks in stages
+            for region in regions
+            for i, stage_stacks in enumerate(stages)
         ]
     }
     print(json.dumps(output))
