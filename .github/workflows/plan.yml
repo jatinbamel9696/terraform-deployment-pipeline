@@ -4,31 +4,48 @@ name: Terraform Plan
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
 
 jobs:
-  generate:
+  generate-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.m.outputs.matrix }}
+      matrix: ${{ steps.generate.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Get changed files (PR safe)
+      - name: Determine SHAs
+        id: shas
         run: |
-          echo "Base: ${{ github.event.pull_request.base.sha }}"
-          echo "Head: ${{ github.sha }}"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "sha1=${{ github.event.pull_request.base.sha }}" >> $GITHUB_OUTPUT
+            echo "sha2=${{ github.sha }}" >> $GITHUB_OUTPUT
+          else
+            echo "sha1=${{ github.event.before }}" >> $GITHUB_OUTPUT
+            echo "sha2=${{ github.sha }}" >> $GITHUB_OUTPUT
+          fi
 
-          git diff --name-only \
-            ${{ github.event.pull_request.base.sha }} \
-            ${{ github.sha }} > changed.txt || true
-
-      - name: Debug
-        run: cat changed.txt || true
-
-      - id: m
+      - name: Generate Matrix
+        id: generate
         run: |
-          python3 .github/scripts/generate_matrix.py > matrix.json
+          python3 scripts/generate_matrix.py ${{ steps.shas.outputs.sha1 }} ${{ steps.shas.outputs.sha2 }} > matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  plan:
+    needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).flat[0]
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).flat }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      stack: ${{ matrix.stack }}
+      region: ${{ matrix.region }}
+      command: plan
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
+    secrets:
+      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}

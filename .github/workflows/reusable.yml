@@ -1,61 +1,77 @@
 
-name: Terraform Reusable
+name: Reusable Terraform Workflow
 
 on:
   workflow_call:
     inputs:
-      stage:
+      stack:
         required: true
         type: string
-      action:
+      region:
         required: true
         type: string
-    # secrets:
-    #   AWS_ACCOUNT_ID:
-    #     required: false
-    #   AWS_ROLE_NAME:
-    #     required: false
+      command:
+        required: true
+        type: string
+        description: 'plan, apply, validate, or drift'
+      assume_role_arn:
+        required: true
+        type: string
+    secrets:
+      aws_role_session_name:
+        required: false
 
 jobs:
   terraform:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include: ${{ fromJson(inputs.stage) }}
-
     steps:
-      - uses: actions/checkout@v4
-      - uses: hashicorp/setup-terraform@v6
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: aws-actions/configure-aws-credentials@v4
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
         with:
-          role-to-assume: arn:aws:iam::363234579585:role/github-actions-role
-          aws-region: ${{ matrix.region }}
+          terraform_version: "1.5.0"
 
-      - name: Init
-        working-directory: ${{ matrix.path }}
-        run: |
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ inputs.assume_role_arn }}
+          aws-region: ${{ inputs.region }}
+          role-session-name: ${{ secrets.aws_role_session_name || 'GitHubActions' }}
 
-          terraform init \
-            -backend-config="bucket=s3-backend-git-9696" \
-            -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
-            -backend-config="region=us-east-1" \
-            -backend-config="dynamodb_table=terraform-locks"
+      - name: Terraform Init
+        working-directory: stacks/${{ inputs.stack }}
+        run: terraform init
 
-
-      - name: Fmt
-        working-directory: ${{ matrix.path }}
+      - name: Terraform Format Check
+        if: inputs.command != 'drift'
+        working-directory: stacks/${{ inputs.stack }}
         run: terraform fmt -check
 
-      - name: Validate
-        working-directory: ${{ matrix.path }}
-        run: terraform validate
+      - name: Setup TFLint
+        if: inputs.command != 'drift'
+        uses: terraform-linters/setup-tflint@v4
 
-      - name: Plan/Apply
-        working-directory: ${{ matrix.path }}
+      - name: TFLint
+        if: inputs.command != 'drift'
+        working-directory: stacks/${{ inputs.stack }}
+        run: tflint
+
+      - name: Terraform Plan
+        if: inputs.command == 'plan'
+        working-directory: stacks/${{ inputs.stack }}
         run: |
-          if [ "${{ inputs.action }}" == "plan" ]; then
-            terraform plan
-          else
-            terraform apply -auto-approve
-          fi
+          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ inputs.assume_role_arn }}" -out=tfplan
+        continue-on-error: true
+
+      - name: Terraform Apply
+        if: inputs.command == 'apply'
+        working-directory: stacks/${{ inputs.stack }}
+        run: terraform apply -auto-approve tfplan
+
+      - name: Terraform Plan (Drift Detection)
+        if: inputs.command == 'drift'
+        working-directory: stacks/${{ inputs.stack }}
+        run: |
+          terraform plan -var="region=${{ inputs.region }}" -var="assume_role_arn=${{ inputs.assume_role_arn }}" -detailed-exitcode

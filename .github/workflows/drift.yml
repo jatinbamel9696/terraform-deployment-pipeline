@@ -2,42 +2,35 @@
 name: Drift Detection
 
 on:
-  # schedule:
-  #   - cron: "0 6 * * *"
+  schedule:
+    - cron: "0 6 * * *"
   workflow_dispatch:
 
 jobs:
-  drift:
+  generate-matrix:
     runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v6
-      - run: echo "" > changed.txt
-      - run: python3 .github/scripts/generate_matrix.py > matrix.json
+      - uses: actions/checkout@v4
 
-      - uses: hashicorp/setup-terraform@v3
+      - name: Generate Matrix
+        id: generate
+        run: |
+          python3 scripts/generate_matrix.py all all > matrix.json
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
-      - run: |
-          for row in $(cat matrix.json | jq -c '.[] | .[]'); do
-            path=$(echo $row | jq -r '.path')
-            region=$(echo $row | jq -r '.region')
-
-            cd $path
-
-
-            terraform init \
-              -backend-config="bucket=s3-backend-git-9696" \
-              -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
-              -backend-config="region=ap-south-1" \
-              -backend-config="dynamodb_table=terraform-locks"
-
-
-                        terraform plan -detailed-exitcode || code=$?
-
-                        if [ "$code" = "2" ]; then
-                          echo "Drift detected in $path"
-                          exit 1
-                        fi
-
-                        cd -
-                      done
+  drift:
+    needs: generate-matrix
+    strategy:
+      matrix:
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).flat }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      stack: ${{ matrix.stack }}
+      region: ${{ matrix.region }}
+      command: drift
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
+    secrets:
+      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}

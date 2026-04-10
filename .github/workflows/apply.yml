@@ -6,28 +6,72 @@ on:
     branches: [main]
 
 jobs:
-  generate:
+  generate-matrix:
     runs-on: ubuntu-latest
     outputs:
-      matrix: ${{ steps.m.outputs.matrix }}
+      matrix: ${{ steps.generate.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v6
-      - run: |
-          git fetch origin main
-          git diff --name-only origin/main...HEAD > changed.txt
-      - id: m
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Determine SHAs
+        id: shas
         run: |
-          python3 .github/scripts/generate_matrix.py > matrix.json
+          echo "sha1=${{ github.event.before }}" >> $GITHUB_OUTPUT
+          echo "sha2=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - name: Generate Matrix
+        id: generate
+        run: |
+          python3 scripts/generate_matrix.py ${{ steps.shas.outputs.sha1 }} ${{ steps.shas.outputs.sha2 }} > matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
-  run:
-    needs: generate
+  stage-1:
+    needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).stages[0]
     strategy:
       matrix:
-        stage: ${{ fromJson(needs.generate.outputs.matrix) }}
+        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0].stacks }}
+        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0].regions }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stage: ${{ matrix.stage }}
-      action: apply
-    secrets: inherit
+      stack: ${{ matrix.stack }}
+      region: ${{ matrix.region }}
+      command: apply
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
+    secrets:
+      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
+
+  stage-2:
+    needs: [generate-matrix, stage-1]
+    if: fromJson(needs.generate-matrix.outputs.matrix).stages[1]
+    strategy:
+      matrix:
+        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1].stacks }}
+        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1].regions }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      stack: ${{ matrix.stack }}
+      region: ${{ matrix.region }}
+      command: apply
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
+    secrets:
+      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
+
+  stage-3:
+    needs: [generate-matrix, stage-2]
+    if: fromJson(needs.generate-matrix.outputs.matrix).stages[2]
+    strategy:
+      matrix:
+        stack: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2].stacks }}
+        region: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2].regions }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      stack: ${{ matrix.stack }}
+      region: ${{ matrix.region }}
+      command: apply
+      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
+    secrets:
+      aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
