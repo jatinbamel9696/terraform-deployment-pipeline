@@ -111,7 +111,7 @@ def main():
     else:
         changed_files = get_changed_files(sha1, sha2)
         affected = get_affected_stacks(changed_files, allowed_stacks)
-        all_affected = get_all_affected_stacks(affected, deps)
+        all_affected = get_all_affected_stacks(affected, deps) & set(allowed_stacks)
 
     if not all_affected:
         print(json.dumps({"flat": [], "regions": [], "stages": []}))
