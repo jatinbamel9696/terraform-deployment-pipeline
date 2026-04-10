@@ -26,6 +26,7 @@ jobs:
         id: generate
         run: |
           python3 scripts/generate_matrix.py all all > matrix.json
+          cat matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   drift:

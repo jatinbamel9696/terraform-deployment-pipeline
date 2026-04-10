@@ -27,6 +27,7 @@ jobs:
           python3 scripts/generate_matrix.py \
             ${{ github.event.pull_request.base.sha }} \
             ${{ github.sha }} > matrix.json
+          cat matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   plan:

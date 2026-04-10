@@ -6,10 +6,11 @@ import sys
 from collections import defaultdict, deque
 
 SHA_RE = re.compile(r'^[0-9a-f]{7,40}$')
+NULL_SHA = '0000000000000000000000000000000000000000'
 
 
 def validate_sha(sha):
-    if sha != 'all' and not SHA_RE.match(sha):
+    if sha != 'all' and sha != NULL_SHA and not SHA_RE.match(sha):
         raise ValueError(f"Invalid SHA: {sha!r}")
 
 
@@ -106,7 +107,7 @@ def main():
     deps = load_dependencies()
     regions = load_regions()
 
-    if sha1 == 'all':
+    if sha1 == 'all' or sha1 == NULL_SHA:
         all_affected = set(allowed_stacks)
     else:
         changed_files = get_changed_files(sha1, sha2)
