@@ -13,7 +13,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - run: git diff --name-only HEAD~1 HEAD > changed.txt
+      - run: |
+          git fetch origin main
+          git diff --name-only origin/main...HEAD > changed.txt
       - id: m
         run: |
           python3 .github/scripts/generate_matrix.py > matrix.json
