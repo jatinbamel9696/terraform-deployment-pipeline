@@ -43,7 +43,11 @@ jobs:
 
       - name: Terraform Init
         working-directory: stacks/${{ inputs.stack }}
-        run: terraform init
+        run: |
+          terraform init \
+            -backend-config="key=stacks/${{ inputs.stack }}/${{ inputs.region }}/terraform.tfstate" \
+            -backend-config="region=${{ inputs.region }}" \
+            -upgrade
 
       - name: Terraform Plan
         if: inputs.command == 'plan'

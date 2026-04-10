@@ -1,8 +1,9 @@
 terraform {
   backend "s3" {
     bucket         = "s3-backend-git-9696"
-    key            = "network/${var.region}/terraform.tfstate"
-    region         = var.region
+    # Use placeholder - will be set at runtime via -backend-config
+    # key format: stacks/network/REGION/terraform.tfstate
     dynamodb_table = "terraform-locks"
+    encrypt        = true
   }
 }
