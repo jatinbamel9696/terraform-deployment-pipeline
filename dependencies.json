@@ -1,5 +1,4 @@
 {
   "network": [],
-  "compute": ["network"],
   "iam": []
 }
