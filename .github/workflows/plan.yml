@@ -43,14 +43,14 @@ jobs:
 
   plan:
     needs: generate-matrix
-    if: fromJson(needs.generate-matrix.outputs.matrix).flat[0]
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions[0]
     strategy:
       matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).flat }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
       command: plan
     secrets:
       ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}

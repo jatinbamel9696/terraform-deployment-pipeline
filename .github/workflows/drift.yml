@@ -31,11 +31,11 @@ jobs:
     needs: generate-matrix
     strategy:
       matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).flat }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
     uses: ./.github/workflows/reusable.yml
     with:
-      stack: ${{ matrix.stack }}
       region: ${{ matrix.region }}
+      stacks: ${{ toJson(matrix.stacks) }}
       command: drift
     secrets:
       ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
