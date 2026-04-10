@@ -1,6 +1,5 @@
-# stacks/storage/main.tf
 resource "aws_s3_bucket" "app_bucket" {
-  bucket = "my-app-bucket-${var.region}"  # ✅ Unique per region
+  bucket = "my-app-bucket-${var.region}"
 }
 
 resource "aws_s3_bucket_versioning" "app_bucket" {
