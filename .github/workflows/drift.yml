@@ -20,6 +20,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Generate Matrix
         id: generate
@@ -29,6 +31,7 @@ jobs:
 
   drift:
     needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions && fromJson(needs.generate-matrix.outputs.matrix).regions[0]
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}

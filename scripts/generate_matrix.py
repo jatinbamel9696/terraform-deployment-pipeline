@@ -5,10 +5,18 @@ import subprocess
 import sys
 from collections import defaultdict, deque
 
+import re
+
+SHA_RE = re.compile(r'^[0-9a-f]{7,40}$')
+
+def validate_sha(sha):
+    if sha != 'all' and not SHA_RE.match(sha):
+        raise ValueError(f"Invalid SHA: {sha!r}")
+
 def get_changed_files(sha1, sha2):
     result = subprocess.run(['git', 'diff', '--name-only', sha1, sha2], capture_output=True, text=True)
     if result.returncode != 0:
-        raise Exception(f"Git diff failed: {result.stderr}")
+        raise RuntimeError(f"Git diff failed: {result.stderr}")
     return result.stdout.strip().split('\n')
 
 def load_include():
@@ -86,6 +94,8 @@ def main():
     
     sha1 = sys.argv[1]
     sha2 = sys.argv[2]
+    validate_sha(sha1)
+    validate_sha(sha2)
     
     allowed_stacks = load_include()
     deps = load_dependencies()

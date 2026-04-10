@@ -74,13 +74,16 @@ jobs:
         run: |
           terraform init \
             -backend-config="key=stacks/${{ matrix.stack }}/${{ inputs.region }}/terraform.tfstate" \
-            -backend-config="region=us-east-1" \
-            -upgrade
+            -backend-config="region=us-east-1"
 
       - name: Terraform Plan
         if: inputs.command == 'plan'
         working-directory: stacks/${{ matrix.stack }}
+        run: terraform plan -var="region=${{ inputs.region }}"
 
+      - name: Terraform Plan (for Apply)
+        if: inputs.command == 'apply'
+        working-directory: stacks/${{ matrix.stack }}
         run: terraform plan -var="region=${{ inputs.region }}" -out=tfplan
 
       - name: Terraform Apply
