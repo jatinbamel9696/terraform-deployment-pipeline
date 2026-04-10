@@ -8,6 +8,7 @@ Production-ready multi-stack, multi-region Terraform CI/CD pipeline using GitHub
 - ✅ AWS OIDC authentication
 - ✅ Remote state with S3 + DynamoDB locking
 - ✅ Quality checks (fmt, validate)
+- ✅ Global service support (IAM, Route53, CloudFront)
 - ✅ Easy stack/region management
 
 ---
@@ -21,77 +22,68 @@ Production-ready multi-stack, multi-region Terraform CI/CD pipeline using GitHub
   ├── drift.yml         # Scheduled drift detection
   └── reusable.yml      # Shared workflow logic
 scripts/
-  └── generate_matrix.py # Dynamic matrix generation
+  └── generate_matrix.py  # Dynamic matrix generation
 stacks/
   ├── network/          # VPC and networking
   ├── iam/              # IAM roles and policies
-  ├── compute/          # EC2 instances (example)
-  └── storage/          # S3 buckets (example)
+  ├── compute/          # EC2 instances
+  └── storage/          # S3 buckets
 modules/
   ├── vpc/              # VPC module
   └── s3/               # S3 bucket module
-include.txt             # Stacks to deploy
+include.txt             # Stacks to deploy (comment out to skip)
 regions.txt             # Regions to deploy to
-dependencies.json       # Stack dependencies
-SETUP_GUIDE.md          # Complete setup instructions
-GITHUB_SECRETS.md       # Secrets configuration
-QUICK_REFERENCE.md      # Quick lookup guide
-SKIPPING_STACKS_AND_REGIONS.md  # Advanced: Skip stacks/regions
+dependencies.json       # Stack dependency ordering
+global_stacks.json      # Per-stack region overrides (global AWS services)
 ```
 
 ---
 
-## 🚀 Quick Start (5 Minutes)
+## 🚀 Quick Start
 
 ### 1. Prerequisites
-- AWS Account
+- AWS Account with OIDC configured
 - GitHub Repository
-- `ASSUME_ROLE_ARN` secret configured (see [GITHUB_SECRETS.md](GITHUB_SECRETS.md))
+- `ASSUME_ROLE_ARN` secret configured
 
 ### 2. Configure Stacks
-Edit `include.txt` to control which stacks deploy:
+Edit `include.txt` — comment out any stack to skip it:
 ```
 stacks/network/**
 stacks/iam/**
+# stacks/compute/**   ← commented = skipped
+# stacks/storage/**   ← commented = skipped
 ```
 
 ### 3. Configure Regions
-Edit `regions.txt` for multi-region deployment:
+Edit `regions.txt`:
 ```
 us-east-1
 ap-south-1
 ```
 
 ### 4. Set Dependencies
-Edit `dependencies.json` to control deployment order:
+Edit `dependencies.json`:
 ```json
 {
   "network": [],
+  "iam": [],
   "compute": ["network"],
-  "iam": []
+  "storage": ["network", "iam"]
 }
 ```
 
-### 5. Create Stack
-```bash
-mkdir -p stacks/my-stack
-cat > stacks/my-stack/main.tf << 'EOF'
-resource "aws_example_resource" "example" {
-  # Your resource definition
+### 5. Configure Global Services
+Edit `global_stacks.json` for stacks that should only deploy to one region:
+```json
+{
+  "iam": ["us-east-1"]
 }
-EOF
 ```
 
 ### 6. Add GitHub Secret
 Go to **Settings → Secrets and variables → Actions** and add:
 - `ASSUME_ROLE_ARN`: `arn:aws:iam::YOUR_ACCOUNT_ID:role/github-actions-terraform-role`
-
-### 7. Push & Watch
-```bash
-git add .
-git commit -m "Add my-stack"
-git push
-```
 
 ---
 
@@ -101,132 +93,49 @@ git push
 
 | Workflow | Trigger | Action |
 |----------|---------|--------|
-| **plan.yml** | PR to main | Runs `terraform plan` on affected stacks |
-| **apply.yml** | Push to main | Runs `terraform apply` with dependency ordering |
-| **drift.yml** | Daily at 6 AM UTC | Detects infrastructure drift |
+| `plan.yml` | PR to main | Runs `terraform plan` on affected stacks |
+| `apply.yml` | Push to main | Runs `terraform apply` with dependency ordering |
+| `drift.yml` | Daily at 6 AM UTC | Detects infrastructure drift |
 
 ### Change Detection
-
 1. Compare git SHAs (base vs head)
 2. Detect changed files
 3. Identify affected stacks from file paths
 4. Include dependent stacks
-5. Generate parallel execution matrix
+5. Filter against `include.txt` (respects comments)
+6. Generate parallel execution matrix
 
 ### Dependency Handling
-
-Given `dependencies.json`:
 ```json
 {
   "network": [],
   "compute": ["network"]
 }
 ```
-
-Pipeline ensures:
-- **Stage 1**: network runs in parallel with iam
-- **Stage 2**: compute runs after stage 1 completes
+- Stage 1: `network` + `iam` run in parallel
+- Stage 2: `compute` runs after stage 1 completes
 
 ### Multi-Region Execution
+Each stack deploys to all regions in `regions.txt` unless overridden in `global_stacks.json`.
 
-With `regions.txt`:
-```
-us-east-1
-ap-south-1
-```
-
-Each stack deploys to ALL regions in parallel. E.g., for 3 stacks × 2 regions = 6 parallel jobs.
-
----
-
-## ❓ Common Questions
-
-### Q: How do I skip the Compute stack?
-A: Edit `include.txt` and remove `stacks/compute/**`:
-```
-stacks/network/**
-stacks/iam/**
-# stacks/compute/**  ← Commented = skipped
-```
-
-### Q: What if my S3 bucket name is the same in both regions?
-A: **It will fail!** S3 bucket names are globally unique. Use region in the name:
-```hcl
-resource "aws_s3_bucket" "app" {
-  bucket = "my-app-${var.region}"  # ✅ Unique per region
+### Global Services
+Services like IAM, Route53, and CloudFront are global — deploying them to multiple regions causes `EntityAlreadyExists` errors. Pin them to one region in `global_stacks.json`:
+```json
+{
+  "_comment": "Global AWS services — deploy to one region only",
+  "iam": ["us-east-1"],
+  "route53": ["us-east-1"],
+  "cloudfront": ["us-east-1"]
 }
 ```
-
-See [SKIPPING_STACKS_AND_REGIONS.md](SKIPPING_STACKS_AND_REGIONS.md) for details.
-
-### Q: How do I deploy only to one region?
-A: Edit `regions.txt` to have one region:
-```
-us-east-1
-```
-
-### Q: Can I manually skip a stage in pipeline?
-A: Not without modifying workflow. Best practice: use `include.txt` for permanent changes.
-
-### Q: How do I add a new stack?
-A:
-1. Create `stacks/my-stack/main.tf`
-2. Add to `include.txt`: `stacks/my-stack/**`
-3. Add to `dependencies.json` (if has dependencies)
-4. Commit and push
-
-### Q: How often does drift detection run?
-A: Daily at 6 AM UTC. Edit `drift.yml` to change schedule.
-
-### Q: What if credentials fail?
-A: Check [GITHUB_SECRETS.md](GITHUB_SECRETS.md) → Troubleshooting section.
-
----
-
-## 📚 Documentation
-
-- **[SETUP_GUIDE.md](SETUP_GUIDE.md)** - Complete setup from scratch (AWS + GitHub)
-- **[GITHUB_SECRETS.md](GITHUB_SECRETS.md)** - Secrets configuration and troubleshooting
-- **[SKIPPING_STACKS_AND_REGIONS.md](SKIPPING_STACKS_AND_REGIONS.md)** - Skip stacks/regions, multi-region S3
-- **[QUICK_REFERENCE.md](QUICK_REFERENCE.md)** - Quick lookup guide
-
----
-
-## 🔄 Workflow Examples
-
-### Example 1: Deploy Network + IAM to 2 regions
-
-**Files**:
-- `include.txt`: network + iam
-- `regions.txt`: us-east-1, ap-south-1
-- `dependencies.json`: network has no deps, iam has no deps
-
-**Result**: 4 parallel jobs
-- network + us-east-1
-- network + ap-south-1
-- iam + us-east-1
-- iam + ap-south-1
-
-### Example 2: Deploy with dependencies
-
-**Files**:
-- `include.txt`: network, compute, iam
-- `dependencies.json`: compute depends on network
-- `regions.txt`: us-east-1
-
-**Result**: 3 jobs in 2 stages
-- **Stage 1** (parallel): network + iam
-- **Stage 2** (after stage 1): compute
 
 ---
 
 ## 🔐 Security
-
-- **No static credentials**: Uses AWS OIDC federation
-- **IAM role**: Configurable via secret
-- **State locking**: DynamoDB prevents concurrent modifications
-- **State encryption**: S3 versioning and encryption enabled
-- **Audit trail**: All changes in git history
+- **No static credentials** — AWS OIDC federation
+- **State locking** — DynamoDB prevents concurrent modifications
+- **State encryption** — S3 with encryption enabled
+- **Audit trail** — all changes in git history
 
 ---
 
@@ -234,65 +143,47 @@ A: Check [GITHUB_SECRETS.md](GITHUB_SECRETS.md) → Troubleshooting section.
 
 | Issue | Cause | Fix |
 |-------|-------|-----|
-| Credentials failed | Secret not set | Add `ASSUME_ROLE_ARN` secret |
-| S3 bucket already exists | Same name in 2 regions | Add `${var.region}` to bucket name |
-| Matrix empty | All stacks skipped | Check `include.txt` |
-| Dependency error | Wrong `dependencies.json` | Review dependency order |
-| No plan output | Changes not detected | Push to trigger workflow |
-
-See [SETUP_GUIDE.md](SETUP_GUIDE.md#troubleshooting) for detailed solutions.
+| `EntityAlreadyExists` | Global service deployed to multiple regions | Add stack to `global_stacks.json` |
+| `Matrix empty` | All stacks skipped | Check `include.txt` |
+| `Dependency error` | Wrong `dependencies.json` | Review dependency order |
+| `Credentials failed` | Secret not set | Add `ASSUME_ROLE_ARN` secret |
+| `fmt check failed` | Unformatted `.tf` files | Run `terraform fmt` locally |
 
 ---
 
 ## 📝 File Reference
 
 ### `include.txt`
-Controls which stacks are deployed. Remove stacks to skip them:
+Controls which stacks deploy. Comment out to skip:
 ```
 stacks/network/**
 stacks/iam/**
-stacks/compute/**
+# stacks/compute/**
 ```
 
 ### `regions.txt`
-Controls regions for multi-region deployment:
+Default regions for all stacks:
 ```
 us-east-1
 ap-south-1
-eu-west-1
 ```
 
 ### `dependencies.json`
-Defines stack execution order:
+Stack execution order:
 ```json
 {
   "network": [],
-  "compute": ["network"],
   "iam": [],
+  "compute": ["network"],
   "storage": ["network", "iam"]
 }
 ```
 
----
-
-## ✨ Features
-
-- ✅ **Change Detection**: Only deploy affected stacks
-- ✅ **Dependency Ordering**: Stacks deploy in correct order
-- ✅ **Parallel Execution**: Independent stacks deploy simultaneously
-- ✅ **Multi-Region**: Deploy to multiple regions with one config
-- ✅ **Drift Detection**: Scheduled drift detection with alerts
-- ✅ **Quality Checks**: fmt, validate
-- ✅ **State Locking**: Prevent concurrent modifications
-- ✅ **OIDC Auth**: No static AWS credentials
-- ✅ **Easy Scaling**: Add stacks without modifying workflows
-
----
-
-## 🎓 Learn More
-
-For detailed setup instructions, see [SETUP_GUIDE.md](SETUP_GUIDE.md).
-
-For quick lookups, see [QUICK_REFERENCE.md](QUICK_REFERENCE.md).
-
-For advanced topics, see [SKIPPING_STACKS_AND_REGIONS.md](SKIPPING_STACKS_AND_REGIONS.md).
+### `global_stacks.json`
+Override regions for global AWS services:
+```json
+{
+  "iam": ["us-east-1"]
+}
+```
+Keys starting with `_` are treated as comments and ignored.

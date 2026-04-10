@@ -1,0 +1,4 @@
+{
+  "_comment": "Stacks listed here deploy to a single region only. Used for global AWS services like IAM, Route53, CloudFront. Stacks not listed deploy to all regions in regions.txt",
+  "iam": ["us-east-1"]
+}
