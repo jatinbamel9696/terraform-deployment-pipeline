@@ -12,22 +12,23 @@ jobs:
       matrix: ${{ steps.m.outputs.matrix }}
 
     steps:
-      - uses: actions/checkout@v6
-      - run: |
-          git fetch origin main
-          git diff --name-only origin/main...HEAD > changed.txt
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Get changed files (PR safe)
+        run: |
+          echo "Base: ${{ github.event.pull_request.base.sha }}"
+          echo "Head: ${{ github.sha }}"
+
+          git diff --name-only \
+            ${{ github.event.pull_request.base.sha }} \
+            ${{ github.sha }} > changed.txt || true
+
+      - name: Debug
+        run: cat changed.txt || true
+
       - id: m
         run: |
           python3 .github/scripts/generate_matrix.py > matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
-
-  run:
-    needs: generate
-    strategy:
-      matrix:
-        stage: ${{ fromJson(needs.generate.outputs.matrix) }}
-    uses: ./.github/workflows/reusable.yml
-    with:
-      stage: ${{ matrix.stage }}
-      action: plan
-    secrets: inherit
