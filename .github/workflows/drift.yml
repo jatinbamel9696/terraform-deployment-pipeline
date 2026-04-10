@@ -1,0 +1,43 @@
+
+name: Drift Detection
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "" > changed.txt
+      - run: python3 .github/scripts/generate_matrix.py > matrix.json
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - run: |
+          for row in $(cat matrix.json | jq -c '.[] | .[]'); do
+            path=$(echo $row | jq -r '.path')
+            region=$(echo $row | jq -r '.region')
+
+            cd $path
+
+
+terraform init \
+  -backend-config="bucket=s3-backend-git-9696" \
+  -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
+  -backend-config="region=ap-south-1" \
+  -backend-config="dynamodb_table=terraform-locks"
+
+
+            terraform plan -detailed-exitcode || code=$?
+
+            if [ "$code" = "2" ]; then
+              echo "Drift detected in $path"
+              exit 1
+            fi
+
+            cd -
+          done

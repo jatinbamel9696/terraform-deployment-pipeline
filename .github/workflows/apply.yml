@@ -1,0 +1,31 @@
+
+name: Terraform Apply
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - run: git diff --name-only HEAD~1 HEAD > changed.txt
+      - id: m
+        run: |
+          python3 .github/scripts/generate_matrix.py > matrix.json
+          echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
+
+  run:
+    needs: generate
+    strategy:
+      matrix:
+        stage: ${{ fromJson(needs.generate.outputs.matrix) }}
+    uses: ./.github/workflows/reusable.yml
+    with:
+      stage: ${{ matrix.stage }}
+      action: apply
+    secrets: inherit

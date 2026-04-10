@@ -1,0 +1,61 @@
+
+name: Terraform Reusable
+
+on:
+  workflow_call:
+    inputs:
+      stage:
+        required: true
+        type: string
+      action:
+        required: true
+        type: string
+    secrets:
+      AWS_ACCOUNT_ID:
+        required: true
+      AWS_ROLE_NAME:
+        required: true
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include: ${{ fromJson(inputs.stage) }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/${{ secrets.AWS_ROLE_NAME }}
+          aws-region: ${{ matrix.region }}
+
+      - name: Init
+        working-directory: ${{ matrix.path }}
+        run: |
+
+terraform init \
+  -backend-config="bucket=s3-backend-git-9696" \
+  -backend-config="key=${{ matrix.module }}/${{ matrix.region }}/terraform.tfstate" \
+  -backend-config="region=ap-south-1" \
+  -backend-config="dynamodb_table=terraform-locks"
+
+
+      - name: Fmt
+        working-directory: ${{ matrix.path }}
+        run: terraform fmt -check
+
+      - name: Validate
+        working-directory: ${{ matrix.path }}
+        run: terraform validate
+
+      - name: Plan/Apply
+        working-directory: ${{ matrix.path }}
+        run: |
+          if [ "${{ inputs.action }}" == "plan" ]; then
+            terraform plan
+          else
+            terraform apply -auto-approve
+          fi
