@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import json
+import os
 import re
 import subprocess
 import sys
@@ -42,6 +43,18 @@ def load_dependencies():
 def load_regions():
     with open('regions.txt', 'r') as f:
         return [line.strip() for line in f if line.strip()]
+
+
+def load_stack_regions():
+    if not os.path.exists('global_stacks.json'):
+        return {}
+    with open('global_stacks.json', 'r') as f:
+        data = json.load(f)
+    return {k: v for k, v in data.items() if not k.startswith('_')}
+
+
+def get_regions_for_stack(stack, regions, stack_regions):
+    return stack_regions.get(stack, regions)
 
 
 def get_affected_stacks(changed_files, allowed_stacks):
@@ -106,6 +119,7 @@ def main():
     allowed_stacks = load_include()
     deps = load_dependencies()
     regions = load_regions()
+    stack_regions = load_stack_regions()
 
     if sha1 == 'all' or sha1 == NULL_SHA:
         all_affected = set(allowed_stacks)
@@ -125,16 +139,18 @@ def main():
             {"stack": stack, "region": region}
             for stage in stages
             for stack in stage
-            for region in regions
+            for region in get_regions_for_stack(stack, regions, stack_regions)
         ],
         "regions": [
-            {"region": region, "stacks": [s for stage in stages for s in stage]}
+            {"region": region, "stacks": [s for stage in stages for s in stage if region in get_regions_for_stack(s, regions, stack_regions)]}
             for region in regions
+            if any(region in get_regions_for_stack(s, regions, stack_regions) for stage in stages for s in stage)
         ],
         "stages": [
-            {"region": region, "stacks": stage_stacks, "stage": i + 1}
+            {"region": region, "stacks": [s for s in stage_stacks if region in get_regions_for_stack(s, regions, stack_regions)], "stage": i + 1}
             for region in regions
             for i, stage_stacks in enumerate(stages)
+            if any(region in get_regions_for_stack(s, regions, stack_regions) for s in stage_stacks)
         ]
     }))
 
