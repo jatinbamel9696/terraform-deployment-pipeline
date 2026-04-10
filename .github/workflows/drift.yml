@@ -10,9 +10,6 @@ permissions:
   id-token: write
   contents: read
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   generate-matrix:
     runs-on: ubuntu-latest
@@ -23,8 +20,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Generate Matrix
         id: generate
@@ -34,7 +29,6 @@ jobs:
 
   drift:
     needs: generate-matrix
-    if: fromJson(needs.generate-matrix.outputs.matrix).regions && fromJson(needs.generate-matrix.outputs.matrix).regions[0]
     strategy:
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
