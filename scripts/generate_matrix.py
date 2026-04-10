@@ -112,6 +112,10 @@ def main():
             for stack in stage
             for region in regions
         ],
+        "regions": [
+            {"region": region, "stacks": [stack for stage in stages for stack in stage]}
+            for region in regions
+        ],
         "stages": [
             {
                 "region": region,

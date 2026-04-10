@@ -34,42 +34,12 @@ jobs:
           python3 scripts/generate_matrix.py ${{ steps.shas.outputs.sha1 }} ${{ steps.shas.outputs.sha2 }} > matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
-  stage-1:
+  deploy:
     needs: generate-matrix
-    if: fromJson(needs.generate-matrix.outputs.matrix).stages[0]
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions[0]
     strategy:
       matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[0] }}
-    uses: ./.github/workflows/reusable.yml
-    with:
-      region: ${{ matrix.region }}
-      stacks: ${{ toJson(matrix.stacks) }}
-      command: apply
-    secrets:
-      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
-      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
-
-  stage-2:
-    needs: [generate-matrix, stage-1]
-    if: fromJson(needs.generate-matrix.outputs.matrix).stages[1]
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[1] }}
-    uses: ./.github/workflows/reusable.yml
-    with:
-      region: ${{ matrix.region }}
-      stacks: ${{ toJson(matrix.stacks) }}
-      command: apply
-    secrets:
-      ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
-      AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
-
-  stage-3:
-    needs: [generate-matrix, stage-2]
-    if: fromJson(needs.generate-matrix.outputs.matrix).stages[2]
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).stages[2] }}
+        include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
     uses: ./.github/workflows/reusable.yml
     with:
       region: ${{ matrix.region }}
