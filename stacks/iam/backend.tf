@@ -2,7 +2,7 @@ terraform {
   backend "s3" {
     bucket         = "s3-backend-git-9696"
     key            = "iam/${var.region}/terraform.tfstate"
-    region         = "us-east-1"
+    region         = var.region
     dynamodb_table = "terraform-locks"
   }
 }
