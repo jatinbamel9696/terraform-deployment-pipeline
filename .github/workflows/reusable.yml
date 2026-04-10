@@ -15,9 +15,9 @@ on:
         type: string
         description: 'plan, apply, or drift'
     secrets:
-      assume_role_arn:
+      ASSUME_ROLE_ARN:
         required: true
-      aws_role_session_name:
+      AWS_ROLE_SESSION_NAME:
         required: false
 
 jobs:
@@ -37,9 +37,9 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ secrets.assume_role_arn }}
+          role-to-assume: ${{ secrets.ASSUME_ROLE_ARN }}
           aws-region: ${{ inputs.region }}
-          role-session-name: ${{ secrets.aws_role_session_name || 'GitHubActions' }}
+          role-session-name: ${{ secrets.AWS_ROLE_SESSION_NAME || 'GitHubActions' }}
 
       - name: Terraform Init
         working-directory: stacks/${{ inputs.stack }}
