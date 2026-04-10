@@ -100,7 +100,7 @@ def main():
     
     if not all_affected:
         # No changes, empty matrix
-        print(json.dumps({"flat": [], "stages": []}))
+        print(json.dumps({"flat": [], "regions": [], "stages": []}))
         return
     
     stages = build_stages(list(all_affected), deps)
