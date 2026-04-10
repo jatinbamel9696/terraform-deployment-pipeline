@@ -8,6 +8,8 @@ on:
 jobs:
   generate-matrix:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
 
@@ -41,7 +43,6 @@ jobs:
       region: ${{ matrix.region }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-2:
@@ -57,7 +58,6 @@ jobs:
       region: ${{ matrix.region }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
 
   stage-3:
@@ -73,5 +73,4 @@ jobs:
       region: ${{ matrix.region }}
       command: apply
     secrets:
-      assume_role_arn: ${{ secrets.ASSUME_ROLE_ARN }}
       aws_role_session_name: ${{ secrets.AWS_ROLE_SESSION_NAME }}
