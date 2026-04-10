@@ -36,9 +36,11 @@ jobs:
     steps:
       - name: Set stacks
         id: set-stacks
+        env:
+          STACKS_INPUT: ${{ inputs.stacks }}
         run: |
-          if [ -n "${{ inputs.stacks }}" ]; then
-            echo "stacks=${{ inputs.stacks }}" >> $GITHUB_OUTPUT
+          if [ -n "$STACKS_INPUT" ]; then
+            echo "stacks=$(echo "$STACKS_INPUT" | jq -c .)" >> $GITHUB_OUTPUT
           else
             echo "stacks=[\"${{ inputs.stack }}\"]" >> $GITHUB_OUTPUT
           fi
