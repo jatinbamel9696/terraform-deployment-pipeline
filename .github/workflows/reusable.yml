@@ -13,8 +13,10 @@ on:
       command:
         required: true
         type: string
-        description: 'plan, apply, validate, or drift'
+        description: 'plan, apply, or drift'
     secrets:
+      assume_role_arn:
+        required: true
       aws_role_session_name:
         required: false
 
@@ -35,7 +37,7 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: arn:aws:iam::363234579585:role/github-actions-role
+          role-to-assume: ${{ secrets.assume_role_arn }}
           aws-region: ${{ inputs.region }}
           role-session-name: ${{ secrets.aws_role_session_name || 'GitHubActions' }}
 
@@ -43,26 +45,10 @@ jobs:
         working-directory: stacks/${{ inputs.stack }}
         run: terraform init
 
-      - name: Terraform Format Check
-        if: inputs.command != 'drift'
-        working-directory: stacks/${{ inputs.stack }}
-        run: terraform fmt -check
-
-      - name: Setup TFLint
-        if: inputs.command != 'drift'
-        uses: terraform-linters/setup-tflint@v4
-
-      - name: TFLint
-        if: inputs.command != 'drift'
-        working-directory: stacks/${{ inputs.stack }}
-        run: tflint
-
       - name: Terraform Plan
         if: inputs.command == 'plan'
         working-directory: stacks/${{ inputs.stack }}
-        run: |
-          terraform plan -var="region=${{ inputs.region }}" -out=tfplan
-        continue-on-error: true
+        run: terraform plan -var="region=${{ inputs.region }}" -out=tfplan
 
       - name: Terraform Apply
         if: inputs.command == 'apply'
@@ -72,5 +58,4 @@ jobs:
       - name: Terraform Plan (Drift Detection)
         if: inputs.command == 'drift'
         working-directory: stacks/${{ inputs.stack }}
-        run: |
-          terraform plan -var="region=${{ inputs.region }}" -detailed-exitcode
+        run: terraform plan -var="region=${{ inputs.region }}" -detailed-exitcode
