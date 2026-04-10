@@ -1,33 +1,48 @@
 #!/usr/bin/env python3
 import json
-import os
+import re
 import subprocess
 import sys
 from collections import defaultdict, deque
 
+SHA_RE = re.compile(r'^[0-9a-f]{7,40}$')
+NULL_SHA = '0000000000000000000000000000000000000000'
+
+
+def validate_sha(sha):
+    if sha != 'all' and sha != NULL_SHA and not SHA_RE.match(sha):
+        raise ValueError(f"Invalid SHA: {sha!r}")
+
+
 def get_changed_files(sha1, sha2):
-    result = subprocess.run(['git', 'diff', '--name-only', sha1, sha2], capture_output=True, text=True)
+    result = subprocess.run(
+        ['git', 'diff', '--name-only', sha1, sha2],
+        capture_output=True, text=True
+    )
     if result.returncode != 0:
-        raise Exception(f"Git diff failed: {result.stderr}")
+        raise RuntimeError(f"Git diff failed: {result.stderr}")
     return result.stdout.strip().split('\n')
+
 
 def load_include():
     with open('include.txt', 'r') as f:
         lines = f.read().strip().split('\n')
-    stacks = []
-    for line in lines:
-        if line.startswith('stacks/') and line.endswith('/**'):
-            stack = line.split('/')[1]
-            stacks.append(stack)
-    return stacks
+    return [
+        line.split('/')[1]
+        for line in lines
+        if line.startswith('stacks/') and line.endswith('/**')
+    ]
+
 
 def load_dependencies():
     with open('dependencies.json', 'r') as f:
         return json.load(f)
 
+
 def load_regions():
     with open('regions.txt', 'r') as f:
         return [line.strip() for line in f if line.strip()]
+
 
 def get_affected_stacks(changed_files, allowed_stacks):
     affected = set()
@@ -37,14 +52,13 @@ def get_affected_stacks(changed_files, allowed_stacks):
                 affected.add(stack)
     return affected
 
+
 def get_all_affected_stacks(affected, deps):
-    # Reverse deps: who depends on whom
     reverse_deps = defaultdict(list)
     for stack, deps_list in deps.items():
         for dep in deps_list:
             reverse_deps[dep].append(stack)
-    
-    # BFS to find all dependents
+
     queue = deque(affected)
     visited = set(affected)
     while queue:
@@ -55,23 +69,23 @@ def get_all_affected_stacks(affected, deps):
                 queue.append(dependent)
     return visited
 
+
 def build_stages(stacks, deps):
-    # Kahn's algorithm for topological sort levels
     in_degree = {stack: 0 for stack in stacks}
     for stack in stacks:
         for dep in deps.get(stack, []):
             if dep in stacks:
                 in_degree[stack] += 1
-    
-    queue = deque([stack for stack in stacks if in_degree[stack] == 0])
+
+    queue = deque([s for s in stacks if in_degree[s] == 0])
     stages = []
     while queue:
         current_stage = []
         for _ in range(len(queue)):
             stack = queue.popleft()
             current_stage.append(stack)
-            for dependent in deps:
-                if stack in deps[dependent]:
+            for dependent in stacks:
+                if stack in deps.get(dependent, []):
                     in_degree[dependent] -= 1
                     if in_degree[dependent] == 0:
                         queue.append(dependent)
@@ -79,33 +93,34 @@ def build_stages(stacks, deps):
             stages.append(current_stage)
     return stages
 
+
 def main():
     if len(sys.argv) != 3:
         print("Usage: python generate_matrix.py <sha1> <sha2>", file=sys.stderr)
         sys.exit(1)
-    
-    sha1 = sys.argv[1]
-    sha2 = sys.argv[2]
-    
+
+    sha1, sha2 = sys.argv[1], sys.argv[2]
+    validate_sha(sha1)
+    validate_sha(sha2)
+
     allowed_stacks = load_include()
     deps = load_dependencies()
     regions = load_regions()
-    
-    if sha1 == "all":
+
+    if sha1 == 'all' or sha1 == NULL_SHA:
         all_affected = set(allowed_stacks)
     else:
         changed_files = get_changed_files(sha1, sha2)
         affected = get_affected_stacks(changed_files, allowed_stacks)
-        all_affected = get_all_affected_stacks(affected, deps)
-    
+        all_affected = get_all_affected_stacks(affected, deps) & set(allowed_stacks)
+
     if not all_affected:
-        # No changes, empty matrix
         print(json.dumps({"flat": [], "regions": [], "stages": []}))
         return
-    
+
     stages = build_stages(list(all_affected), deps)
-    
-    output = {
+
+    print(json.dumps({
         "flat": [
             {"stack": stack, "region": region}
             for stage in stages
@@ -113,20 +128,16 @@ def main():
             for region in regions
         ],
         "regions": [
-            {"region": region, "stacks": [stack for stage in stages for stack in stage]}
+            {"region": region, "stacks": [s for stage in stages for s in stage]}
             for region in regions
         ],
         "stages": [
-            {
-                "region": region,
-                "stacks": stage_stacks,
-                "stage": i + 1
-            }
+            {"region": region, "stacks": stage_stacks, "stage": i + 1}
             for region in regions
             for i, stage_stacks in enumerate(stages)
         ]
-    }
-    print(json.dumps(output))
+    }))
+
 
 if __name__ == "__main__":
     main()

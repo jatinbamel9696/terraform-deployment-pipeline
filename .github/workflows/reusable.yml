@@ -1,23 +1,15 @@
-
 name: Reusable Terraform Workflow
 
 on:
   workflow_call:
     inputs:
-      stack:
-        required: false
-        type: string
       region:
         required: true
         type: string
       stacks:
-        required: false
+        required: true
         type: string
-        description: 'JSON array of stacks to process'
-      stage:
-        required: false
-        type: number
-        description: 'Deployment stage number'
+        description: 'JSON array of stack names'
       command:
         required: true
         type: string
@@ -28,31 +20,16 @@ on:
       AWS_ROLE_SESSION_NAME:
         required: false
 
-jobs:
-  prepare:
-    runs-on: ubuntu-latest
-    outputs:
-      stacks: ${{ steps.set-stacks.outputs.stacks }}
-    steps:
-      - name: Set stacks
-        id: set-stacks
-        env:
-          STACKS_INPUT: ${{ inputs.stacks }}
-        run: |
-          if [ -n "$STACKS_INPUT" ]; then
-            echo "stacks=$(echo "$STACKS_INPUT" | jq -c .)" >> $GITHUB_OUTPUT
-          else
-            echo "stacks=[\"${{ inputs.stack }}\"]" >> $GITHUB_OUTPUT
-          fi
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
+jobs:
   terraform:
-    needs: prepare
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     strategy:
+      fail-fast: false
       matrix:
-        stack: ${{ fromJson(needs.prepare.outputs.stacks) }}
+        stack: ${{ fromJson(inputs.stacks) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -60,7 +37,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v4
         with:
-          terraform_version: "1.5.0"
+          terraform_version: "1.9.0"
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
@@ -74,11 +51,25 @@ jobs:
         run: |
           terraform init \
             -backend-config="key=stacks/${{ matrix.stack }}/${{ inputs.region }}/terraform.tfstate" \
-            -backend-config="region=us-east-1" \
-            -upgrade
+            -backend-config="region=us-east-1"
+
+      - name: Terraform Format Check
+        if: inputs.command == 'plan'
+        working-directory: stacks/${{ matrix.stack }}
+        run: terraform fmt -check -recursive
+
+      - name: Terraform Validate
+        if: inputs.command == 'plan'
+        working-directory: stacks/${{ matrix.stack }}
+        run: terraform validate
 
       - name: Terraform Plan
         if: inputs.command == 'plan'
+        working-directory: stacks/${{ matrix.stack }}
+        run: terraform plan -var="region=${{ inputs.region }}"
+
+      - name: Terraform Plan (for Apply)
+        if: inputs.command == 'apply'
         working-directory: stacks/${{ matrix.stack }}
         run: terraform plan -var="region=${{ inputs.region }}" -out=tfplan
 

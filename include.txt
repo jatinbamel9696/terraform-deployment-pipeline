@@ -1,3 +1,4 @@
 stacks/network/**
 stacks/iam/**
-
+# stacks/compute/**
+# stacks/storage/**

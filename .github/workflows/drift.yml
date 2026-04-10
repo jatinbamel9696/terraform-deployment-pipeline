@@ -1,4 +1,3 @@
-
 name: Drift Detection
 
 on:
@@ -10,26 +9,31 @@ permissions:
   id-token: write
   contents: read
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   generate-matrix:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     outputs:
       matrix: ${{ steps.generate.outputs.matrix }}
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Generate Matrix
         id: generate
         run: |
           python3 scripts/generate_matrix.py all all > matrix.json
+          cat matrix.json
           echo "matrix=$(cat matrix.json)" >> $GITHUB_OUTPUT
 
   drift:
     needs: generate-matrix
+    if: fromJson(needs.generate-matrix.outputs.matrix).regions[0] != null
     strategy:
+      fail-fast: false
       matrix:
         include: ${{ fromJson(needs.generate-matrix.outputs.matrix).regions }}
     uses: ./.github/workflows/reusable.yml
@@ -40,4 +44,3 @@ jobs:
     secrets:
       ASSUME_ROLE_ARN: ${{ secrets.ASSUME_ROLE_ARN }}
       AWS_ROLE_SESSION_NAME: ${{ secrets.AWS_ROLE_SESSION_NAME }}
-
